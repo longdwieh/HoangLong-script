@@ -1,0 +1,409 @@
+getgenv().Key = "Key Dau Thk Cho"
+
+getgenv().id = "Id Discord"
+
+
+
+local HttpService = game:GetService("HttpService")
+
+local Players = game:GetService("Players")
+
+
+
+local CONFIG = {
+
+    RAW_URL = "https://luacrack.site/raw.php/Hoanglong927/raw/Key/Whitelist.txt",
+
+    API_URL = "https://luacrack.site/raw.php",
+
+    API_TOKEN = "e87ddf443a235b58d2d962d1cff5e8ff",
+
+    FILE_KEY = "Key/Whitelist.txt"
+
+}
+
+
+
+local function getHWID()
+
+    local success, hwid = pcall(function()
+
+        return game:GetService("RbxAnalyticsService"):GetClientId()
+
+    end)
+
+    return success and hwid or "HWID_ERROR"
+
+end
+
+
+
+local function getWhitelistData()
+
+    local success, result = pcall(function()
+
+        return game:HttpGet(CONFIG.RAW_URL .. "?t=" .. tostring(tick()))
+
+    end)
+
+
+
+    if not success then
+
+        return nil, "Unable to connect to whitelist server."
+
+    end
+
+
+
+    return result, nil
+
+end
+
+
+
+local function parseWhitelistData(data)
+
+    local whitelist = {}
+
+    for line in data:gmatch("[^\r\n]+") do  
+
+        local key = line:match('"([^"]+)"')  
+
+        local discordId = line:match('discordid:%s*([^",]+)')  
+
+        local hwid = line:match('hwid:%s*([^",]+)')
+
+
+
+        if key then  
+
+            table.insert(whitelist, {  
+
+                key = key,  
+
+                discordId = discordId and discordId:gsub('"', ''):gsub('%s+', '') or "",  
+
+                hwid = hwid and hwid:gsub('"', ''):gsub('%s+', '') or nil  
+
+            })  
+
+        end  
+
+    end
+
+    return whitelist
+
+end
+
+
+
+local function registerHWID(userKey, userDiscordId, userHwid)
+
+    print("Detected first-time run. Updating HWID to server...")
+
+
+
+    local currentContent, err = getWhitelistData()
+
+    if not currentContent then 
+
+        warn("Failed to fetch current data for update: " .. tostring(err))
+
+        return false 
+
+    end
+
+
+
+    local whitelist = parseWhitelistData(currentContent)
+
+    local found = false
+
+    
+
+    local newContentLines = {}
+
+    
+
+    for _, entry in ipairs(whitelist) do
+
+        if entry.key == userKey and entry.discordId == userDiscordId then
+
+            entry.hwid = userHwid
+
+            found = true
+
+        end
+
+        
+
+        local line = string.format('"%s","discordid: %s"', entry.key, entry.discordId)
+
+        if entry.hwid then
+
+            line = line .. string.format(',"hwid: %s"', entry.hwid)
+
+        end
+
+        table.insert(newContentLines, line)
+
+    end
+
+
+
+    if not found then
+
+        warn("Key not found during update process.")
+
+        return false
+
+    end
+
+
+
+    local finalContent = table.concat(newContentLines, "\n")
+
+
+
+    local function urlEncode(str)
+
+        if (str) then
+
+            str = string.gsub (str, "\n", "\r\n")
+
+            str = string.gsub (str, "([^%w %-%_%.%~])",
+
+                function (c) return string.format ("%%%02X", string.byte(c)) end)
+
+            str = string.gsub (str, " ", "+")
+
+        end
+
+        return str
+
+    end
+
+    
+
+    local bodyStr = "action=save" 
+
+                  .. "&api_token=" .. CONFIG.API_TOKEN 
+
+                  .. "&key=" .. urlEncode(CONFIG.FILE_KEY) 
+
+                  .. "&content=" .. urlEncode(finalContent)
+
+
+
+    local success, response = pcall(function()
+
+        return request({
+
+            Url = CONFIG.API_URL,
+
+            Method = "POST",
+
+            Headers = { ["Content-Type"] = "application/x-www-form-urlencoded" },
+
+            Body = bodyStr
+
+        })
+
+    end)
+
+
+
+    if success then
+
+        print("Server response: " .. tostring(response.Body))
+
+        return true
+
+    else
+
+        warn("Failed to send update request: " .. tostring(response))
+
+        return false
+
+    end
+
+end
+
+
+
+local function checkWhitelist()
+
+    local currentHWID = getHWID()
+
+    local currentDiscordId = getgenv().id
+
+    local currentKey = getgenv().Key
+
+
+
+    print("Checking whitelist...")
+
+    print("Key: " .. tostring(currentKey))
+
+    print("Discord ID: " .. tostring(currentDiscordId))
+
+    print("HWID: " .. tostring(currentHWID))
+
+
+
+    if not currentKey or currentKey == "" or currentKey == "Xeter123" then  
+
+        Players.LocalPlayer:Kick("Please enter your getgenv().Key in the script.")  
+
+        return false  
+
+    end  
+
+
+
+    if not currentDiscordId or currentDiscordId == "" or currentDiscordId == "123456789012345678" then  
+
+        Players.LocalPlayer:Kick("Please set your Discord ID in getgenv().IdUser.")  
+
+        return false  
+
+    end  
+
+
+
+    local whitelistData, error = getWhitelistData()  
+
+    if not whitelistData then  
+
+        Players.LocalPlayer:Kick(error)  
+
+        return false  
+
+    end  
+
+
+
+    local whitelist = parseWhitelistData(whitelistData)
+
+
+
+    local keyEntry = nil  
+
+    for _, entry in pairs(whitelist) do  
+
+        if entry.key == currentKey then  
+
+            keyEntry = entry  
+
+            break  
+
+        end  
+
+    end  
+
+
+
+    if not keyEntry then  
+
+        Players.LocalPlayer:Kick("Invalid key.\nUse /redeem on Discord to activate your key.")  
+
+        return false  
+
+    end  
+
+
+
+    if keyEntry.discordId ~= currentDiscordId then  
+
+        Players.LocalPlayer:Kick(
+
+            "This key does not belong to you.\nDiscord ID mismatch.\nRegistered to: " .. (keyEntry.discordId or "Not activated")
+
+        )  
+
+        return false  
+
+    end  
+
+
+
+    if keyEntry.hwid then  
+
+        if keyEntry.hwid ~= currentHWID then  
+
+            Players.LocalPlayer:Kick(
+
+                "HWID mismatch.\nYour HWID: " .. currentHWID ..
+
+                "\nRegistered HWID: " .. keyEntry.hwid ..
+
+                "\nUse /resethwid on Discord to reset your HWID."
+
+            )  
+
+            return false  
+
+        end  
+
+
+
+        print("Whitelist verified successfully.")
+
+        return true  
+
+    else  
+
+        local updated = registerHWID(currentKey, currentDiscordId, currentHWID)
+
+
+
+        if updated then  
+
+            print("HWID registered successfully via API.")
+
+            print("Wait 3 seconds...")
+
+            wait(3)
+
+            return true  
+
+        else  
+
+            print("Failed to register HWID via API.")
+
+            return true 
+
+        end  
+
+    end
+
+end
+
+
+
+local isWhitelisted = checkWhitelist()
+
+if not isWhitelisted then return end
+
+
+
+print("Whitelist check passed.")
+
+
+
+game.StarterGui:SetCore("SendNotification", {
+
+    Title = "Whitelist Success",
+
+    Text = "Welcome to the script.",
+
+    Duration = 5
+
+})
+
+
+
+print("Script loaded successfully.")
+
+print("Welcome " .. Players.LocalPlayer.Name .. ".")
